@@ -31,7 +31,5 @@ namespace BankApp
                 _receiver.AccountNumber, _sender.AccountNumber, _name, _amount, _type));
             return sb.ToString();
         }
-
-
     }
 }

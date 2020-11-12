@@ -82,6 +82,5 @@ namespace BankApp
             sb.Append("\n");
             return sb.ToString();
         }
-
     }
 }
