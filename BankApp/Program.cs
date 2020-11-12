@@ -47,18 +47,15 @@ namespace BankApp
                         break;
                 }
             }
-
             while (true);
         }
 
         private static void HandleDomesticTransfer()
         {
-
             if (accounts.Count < 2)
             {
                 Console.WriteLine("\nYou need to have at least two accounts to make a domestic transfer!");
             }
-
             else
             {
                 try
@@ -84,7 +81,6 @@ namespace BankApp
                 {
                     Console.WriteLine(e.Message);
                 }
-                
             }
         }
 
@@ -95,7 +91,6 @@ namespace BankApp
                 Console.WriteLine("\nYou need to have at least one account to make an outgoing transfer!");
                 return;
             }
-
             else
             {
                 try
@@ -122,7 +117,6 @@ namespace BankApp
                     Console.WriteLine(e.Message);
                 }
             }
-
         }
 
         private static Account ProvideTransactorData(string message)
@@ -149,7 +143,6 @@ namespace BankApp
                     return account;
                 }
             }
-
             return null;
         }
 
@@ -166,7 +159,6 @@ namespace BankApp
             {
                 Console.WriteLine($"\nAn account with name {name} already exists.");
             }
-
         }
 
         private static void PrintAccountsBalance()
@@ -185,7 +177,7 @@ namespace BankApp
                 sb.Append(account.ToString());
             }
 
-            Console.WriteLine(sb);
+            Console.WriteLine(sb.ToString());
         }
 
         private static void PrintAccountHistory()
@@ -253,7 +245,6 @@ namespace BankApp
             }
 
             return number;
-
         }
     }
 
