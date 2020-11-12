@@ -5,9 +5,9 @@ using System.Text;
 
 namespace BankApp
 {
-    class Program
+    static class Program
     {
-        public static List<Account> accounts = new List<Account>();
+        private static List<Account> accounts = new List<Account>();
         static void Main(string[] args)
         {
             do
@@ -153,7 +153,7 @@ namespace BankApp
             return null;
         }
 
-        public static void CreateAccount()
+        private static void CreateAccount()
         {
             string name = GetTextFromUser("Provide a name of your account");
 
@@ -188,7 +188,7 @@ namespace BankApp
             Console.WriteLine(sb);
         }
 
-        public static void PrintAccountHistory()
+        private static void PrintAccountHistory()
         {
             if (accounts.Count == 0)
             {
