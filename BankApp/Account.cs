@@ -8,79 +8,74 @@ namespace BankApp
     class Account
     {
         public string Name { get; private set; }
-        public Guid AccountNumber { get; }
-        public decimal AccountBalance { get; private set; }
+        public Guid Number { get; }
+        public decimal Balance { get; private set; }
         public List<Transfer> TransferList { get; }
 
         public Account(Guid number)
         {
-            AccountNumber = number;
+            Number = number;
         }
 
         public Account(string name)
         {
             Name = name;
-            AccountNumber = Guid.NewGuid();
-            AccountBalance = 1000.00m;
+            Number = Guid.NewGuid();
+            Balance = 1000.00m;
             TransferList = new List<Transfer>();
         }
 
         public void MakeTransfer(Account receiver, decimal amount, string name, string type)
         {
-            try
-            {
-                CheckIfValidAmount(amount);
 
-                if (type == "domestic")
-                {
-                    CheckIfValidReceiver(receiver);
-                }
-            }
-
-            catch (Exception e)
+            if (!CheckIfValidAmount(amount))
             {
-                Console.WriteLine(e.Message);
                 return;
             }
 
-            AccountBalance -= amount;
+            if (type == "domestic")
+            {
+                CheckIfValidReceiver(receiver);
+                Console.WriteLine("Receiver account is the same");
+            }
+
+            Balance -= amount;
             Transfer transfer = new Transfer(this, receiver, amount, name, type);
             TransferList.Add(transfer);
+            receiver.TransferList.Add(transfer);
 
             if (type == "domestic")
             {
-                receiver.AccountBalance += amount;
+                receiver.Balance += amount;
             }
 
             Console.WriteLine("\nTransfer executed successfully.");
         }
 
-        private void CheckIfValidReceiver(Account receiver)
+        private bool CheckIfValidReceiver(Account receiver)
         {
-            if (object.ReferenceEquals(receiver, this))
-            {
-                throw new ArgumentException("Receiver account is the same");
-            }
+            return !(object.ReferenceEquals(receiver, this) || receiver == null);
         }
 
-        private void CheckIfValidAmount(decimal amount)
+        private bool CheckIfValidAmount(decimal amount)
         {
             if (amount <= 0)
             {
-                throw new ArgumentOutOfRangeException("Amount of transfer must be positive");
+                Console.WriteLine("Amount of transfer must be positive");
+                return false;
             }
-            else if (AccountBalance - amount < 0)
+            else if (Balance - amount < 0)
             {
-                throw new InvalidOperationException("Not sufficient funds for this transfer");
+                Console.WriteLine("Not sufficient funds for this transfer");
+                return false;
             }
+
+            return true;
         }
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
-            sb.Append(string.Format(CultureInfo.GetCultureInfo("en-US"), "{0,-20}{1,-40} {2,-20:C2}", Name, AccountNumber, AccountBalance));
-            sb.Append("\n");
-            return sb.ToString();
+            return $"{Name,-20}{Number,-40}{Balance,-20:C2}\n";
         }
     }
 }

@@ -26,10 +26,7 @@ namespace BankApp
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
-            sb.Append(string.Format(CultureInfo.GetCultureInfo("en-US"), "{0,-0:dd/MM/yyyy HH:mm:ss} {1,-36} {2,-36} {3,-25} {4,-20:C2} {5,-20}\n", _transferDate,
-                _receiver.AccountNumber, _sender.AccountNumber, _name, _amount, _type));
-            return sb.ToString();
+            return $"{_transferDate,-0:dd/MM/yyyy HH:mm:ss} {_receiver.Number,-36} {_sender.Number,-36} {_name,-25} {_amount,-20:C2} {_type,-20}\n";
         }
     }
 }

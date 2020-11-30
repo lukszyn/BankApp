@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Linq;
 
 namespace BankApp
 {
@@ -10,6 +11,8 @@ namespace BankApp
         private static List<Account> accounts = new List<Account>();
         static void Main(string[] args)
         {
+            int userChoice;
+
             do
             {
                 Console.WriteLine();
@@ -21,7 +24,7 @@ namespace BankApp
                 Console.WriteLine("Press 5 to display transfers\' history");
                 Console.WriteLine("Press 0 to Exit");
 
-                int userChoice = GetIntFromUser("Select option");
+                userChoice = GetIntFromUser("Select option");
 
                 switch (userChoice)
                 {
@@ -31,10 +34,10 @@ namespace BankApp
                         CreateAccount();
                         break;
                     case 2:
-                        HandleDomesticTransfer();
+                        HandleTransfer("domestic", 2);
                         break;
                     case 3:
-                        HandleOutgoingTransfer();
+                        HandleTransfer("external", 1);
                         break;
                     case 4:
                         PrintAccountsBalance();
@@ -47,98 +50,61 @@ namespace BankApp
                         break;
                 }
             }
-            while (true);
+            while (userChoice != 0);
         }
 
-        private static void HandleDomesticTransfer()
+        private static void HandleTransfer(string type, int accountsNeeded)
         {
-            if (accounts.Count < 2)
+            if (accounts.Count < accountsNeeded)
             {
-                Console.WriteLine("\nYou need to have at least two accounts to make a domestic transfer!");
+                Console.WriteLine($"\nYou need to have at least {accountsNeeded} accounts to make a {type} transfer!");
             }
-            else
+
+            Account sender = ProvideTransactorData("Provide name of the account you want to send money from");
+            Account receiver;
+
+            if (type =="external")
             {
-                try
-                {
-                    Account sender = ProvideTransactorData("Provide name of the account you want to send money from");
-                    Account receiver = ProvideTransactorData("Provide name of the account you want to send money to");
-
-                    if (sender != null && receiver != null)
-                    {
-                        decimal amount = GetDecimalFromUser("Input a transfer amount");
-                        string transferName = GetTextFromUser("Input a transfer name");
-
-                        sender.MakeTransfer(receiver, amount, transferName, "domestic");
-
-                    }
-
-                    else
-                    {
-                        Console.WriteLine("Invalid data. Try again.");
-                    }
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                }
+                Guid receiverId = Guid.Parse(GetTextFromUser("Provide account number of the account you want to send money to"));
+                receiver = new Account(receiverId);
             }
+
+            receiver = ProvideTransactorData("Provide name of the account you want to send money to");
+
+            if (sender != null && receiver != null)
+            {
+                ExecuteTransfer(sender, receiver, type);
+            }
+
         }
 
-        private static void HandleOutgoingTransfer()
+        private static void ExecuteTransfer(Account sender, Account receiver, string type)
         {
-            if (accounts.Count < 1)
-            {
-                Console.WriteLine("\nYou need to have at least one account to make an outgoing transfer!");
-                return;
-            }
-            else
-            {
-                try
-                {
-                    Account sender = ProvideTransactorData("Provide name of the account you want to send money from");
-                    Guid receiverId = Guid.Parse(GetTextFromUser("Provide account number of the account you want to send money to"));
-                    Account receiver = new Account(receiverId);
+            decimal amount = GetDecimalFromUser("Input a transfer amount");
+            string transferName = GetTextFromUser("Input a transfer name");
 
-                    if (sender != null)
-                    {
-                        decimal amount = GetDecimalFromUser("Input a transfer amount");
-                        string transferName = GetTextFromUser("Input a transfer name");
-
-                        sender.MakeTransfer(receiver, amount, transferName, "external");
-                    }
-                    else
-                    {
-                        Console.WriteLine("Invalid data. Try again.");
-                    }
-
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                }
-            }
+            sender.MakeTransfer(receiver, amount, transferName, type);
         }
+
 
         private static Account ProvideTransactorData(string message)
         {
             string transactorId = GetTextFromUser(message);
             Account transactor = GetAccountFromList(transactorId);
 
-            if (transactor != null)
+            if (transactor == null)
             {
-                return transactor;
+                Console.WriteLine("\nAn account with given name does not exist.");
             }
-            else
-            {
-                throw new NullReferenceException("\nAn account with given name does not exist.");
-            }
+
+            return transactor;
         }
 
         private static Account GetAccountFromList(string id)
         {
             foreach (Account account in accounts)
             {
-                if (account.Name == id || account.AccountNumber.ToString() == id)
+                if (account.Name == id || account.Number.ToString() == id)
                 {
                     return account;
                 }
@@ -170,7 +136,7 @@ namespace BankApp
             }
 
             StringBuilder sb = new StringBuilder();
-            sb.Append(string.Format("\n{0,-20}{1,-40} {2,-20}\n", "Account Name", "Account Number", "Balance"));
+            sb.Append(string.Format("\n{0,-20}{1,-40}{2,-20}\n", "Account Name", "Account Number", "Balance"));
 
             foreach (Account account in accounts)
             {
@@ -188,34 +154,31 @@ namespace BankApp
                 return;
             }
 
-            try
+            foreach (Account account in accounts)
             {
-
-                foreach (Account account in accounts)
+                if (account.TransferList.Count == 0)
                 {
-                    if (account.TransferList.Count == 0)
-                    {
-                        Console.WriteLine("\nNo transfers has been sent");
-                    }
-
-                    StringBuilder sb = new StringBuilder();
-                    sb.Append(string.Format("{0, -10} {1, -20}\n", "Nazwa konta: ", account.Name));
-                    sb.Append(string.Format(CultureInfo.GetCultureInfo("en-US"), "\n{0,-19} {1,-36} {2,-36} {3,-25} {4,-20} {5,-20}\n",
-                        "Transfer Date", "Receiver Account Number", "Sender Account Number", "Transfer Name", "Transfer Amount", "Transfer Type"));
-
-                    foreach (Transfer transfer in account.TransferList)
-                    {
-                        sb.Append(transfer.ToString());
-                    }
-
-                    Console.WriteLine(sb);
+                    Console.WriteLine("\nNo transfers has been sent");
                 }
 
+                Console.WriteLine($"{"Nazwa konta: ",-10} {account.Name,-20}\n");
+                
+                StringBuilder sb = new StringBuilder();
+                sb.Append($"\n{"Transfer Date",-19}" +
+                          $" {"Receiver Account Number",-36}" +
+                          $" {"Sender Account Number",-36}" +
+                          $" {"Transfer Name",-25}" +
+                          $" {"Transfer Amount",-20}" +
+                          $" {"Transfer Type",-20}\n");
+
+                foreach (Transfer transfer in account.TransferList)
+                {
+                    sb.Append(transfer.ToString());
+                }
+
+                Console.WriteLine(sb);
             }
-            catch (NullReferenceException e)
-            {
-                Console.WriteLine(e.Message);
-            }
+
         }
 
         private static string GetTextFromUser(string message)
