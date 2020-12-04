@@ -1,214 +1,279 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Text;
-using System.Linq;
+using BankApp.BusinessLayer;
+using BankApp.DataLayer.Model;
 
 namespace BankApp
 {
-    static class Program
+    class Program
     {
-        private static List<Account> accounts = new List<Account>();
-        static void Main(string[] args)
+        private Menu _loggingMenu = new Menu();
+        private Menu _menu = new Menu();
+        private IoHelper _ioHelper = new IoHelper();
+        private AccountsService _accountsService = new AccountsService();
+        private TransfersService _transfersService = new TransfersService();
+        private UsersService _usersService = new UsersService();
+        private DatabaseManagementService _databaseManagementService = new DatabaseManagementService();
+        private User _loggedUser;
+
+        static void Main()
         {
+            new Program().Run();
+        }
+
+        void Run()
+        {
+            _databaseManagementService.EnsureDatabaseCreation();
+            RegisterLogMenuOptions();
             int userChoice;
 
             do
             {
-                Console.WriteLine();
-                Console.WriteLine("Choose action: ");
-                Console.WriteLine("Press 1 to create an account");
-                Console.WriteLine("Press 2 to make a domestic transfer");
-                Console.WriteLine("Press 3 to make an outgoing transfer");
-                Console.WriteLine("Press 4 to display your accounts\' balance");
-                Console.WriteLine("Press 5 to display transfers\' history");
-                Console.WriteLine("Press 0 to Exit");
+                _loggingMenu.PrintAvailableOptions();
 
-                userChoice = GetIntFromUser("Select option");
+                userChoice = _ioHelper.GetIntFromUser("Choose action");
 
-                switch (userChoice)
-                {
-                    case 0:
-                        return;
-                    case 1:
-                        CreateAccount();
-                        break;
-                    case 2:
-                        HandleTransfer("domestic", 2);
-                        break;
-                    case 3:
-                        HandleTransfer("external", 1);
-                        break;
-                    case 4:
-                        PrintAccountsBalance();
-                        break;
-                    case 5:
-                        PrintAccountHistory();
-                        break;
-                    default:
-                        Console.WriteLine("Unknown option");
-                        break;
-                }
+                _loggingMenu.ExecuteOption(userChoice);
+
+                if (userChoice == 0) return;
+                else if (_loggedUser != null) break;
+            }
+            while (userChoice != 0 || _loggedUser == null);
+
+            RegisterMenuOptions();
+
+            do
+            {
+                _menu.PrintAvailableOptions();
+
+                userChoice = _ioHelper.GetIntFromUser("Choose action");
+
+                _menu.ExecuteOption(userChoice);
+
+                if (userChoice == 0) return;
             }
             while (userChoice != 0);
-        }
-
-        private static void HandleTransfer(string type, int accountsNeeded)
-        {
-            if (accounts.Count < accountsNeeded)
-            {
-                Console.WriteLine($"\nYou need to have at least {accountsNeeded} accounts to make a {type} transfer!");
-            }
-
-            Account sender = ProvideTransactorData("Provide name of the account you want to send money from");
-            Account receiver;
-
-            if (type =="external")
-            {
-                Guid receiverId = Guid.Parse(GetTextFromUser("Provide account number of the account you want to send money to"));
-                receiver = new Account(receiverId);
-            }
-
-            receiver = ProvideTransactorData("Provide name of the account you want to send money to");
-
-            if (sender != null && receiver != null)
-            {
-                ExecuteTransfer(sender, receiver, type);
-            }
 
         }
 
-        private static void ExecuteTransfer(Account sender, Account receiver, string type)
+        private void RegisterLogMenuOptions()
         {
-            decimal amount = GetDecimalFromUser("Input a transfer amount");
-            string transferName = GetTextFromUser("Input a transfer name");
-
-            sender.MakeTransfer(receiver, amount, transferName, type);
+            _loggingMenu.AddOption(new MenuItem { Key = 1, Action = SignUp, Description = "Sign up to the BankApp" });
+            _loggingMenu.AddOption(new MenuItem { Key = 2, Action = SignIn, Description = "Sign in to your BankApp account" });
         }
 
-
-        private static Account ProvideTransactorData(string message)
+        private void RegisterMenuOptions()
         {
-            string transactorId = GetTextFromUser(message);
-            Account transactor = GetAccountFromList(transactorId);
+            _menu.AddOption(new MenuItem { Key = 3, Action = CreateAccount, Description = "Create an account" });
+            _menu.AddOption(new MenuItem { Key = 4, Action = HandleDomesticTransfer, Description = "Make a domestic transfer" });
+            _menu.AddOption(new MenuItem { Key = 5, Action = HandleExternalTransfer, Description = "Make an outgoing transfer" });
+            _menu.AddOption(new MenuItem { Key = 6, Action = PrintAccountsBalance, Description = "Display your accounts\' balance" });
+            _menu.AddOption(new MenuItem { Key = 7, Action = PrintAccountHistory, Description = "Display transfers\' history" });
+        }
 
-            if (transactor == null)
+        private void SignUp()
+        {
+            string email = _ioHelper.GetTextFromUser("Provide an email");
+
+            if (!_ioHelper.ValidateEmail(email))
             {
-                Console.WriteLine("\nAn account with given name does not exist.");
+                Console.WriteLine("Email must contain \'@\' character!");
+                return;
             }
 
-            return transactor;
-        }
+            string password = _ioHelper.GetTextFromUser("Provide a password (minimum 6 characters)");
 
-        private static Account GetAccountFromList(string id)
-        {
-            foreach (Account account in accounts)
+            if (!_ioHelper.ValidatePassword(password))
             {
-                if (account.Name == id || account.Number.ToString() == id)
-                {
-                    return account;
-                }
+                Console.WriteLine("Password must have at least 6 characters!");
+                return;
             }
-            return null;
+
+            string phoneNumber = _ioHelper.GetTextFromUser("Provide a phone number");
+
+            if (!_ioHelper.ValidatePhoneNumber(phoneNumber))
+            {
+                Console.WriteLine("Phone number must consist of 9 digits!");
+                return;
+            }
+
+            var newUser = new User(email, phoneNumber, password);
+
+            if (_usersService.CheckIfUserExists(newUser.Email))
+            {
+                Console.WriteLine("User with given email already exists!\n");
+                return;
+            }
+
+            _usersService.Add(newUser);
+            Console.WriteLine("User account registered successfully!\n");
+
         }
 
-        private static void CreateAccount()
+        private void SignIn()
         {
-            string name = GetTextFromUser("Provide a name of your account");
+            string email = _ioHelper.GetTextFromUser("Provide an email");
+            string password = _ioHelper.GetTextFromUser("Provide a password");
 
-            if (GetAccountFromList(name) == null)
+            if(!_usersService.CheckCredentials(email, password))
             {
-                accounts.Add(new Account(name));
-                Console.WriteLine($"\nAccount {name} created successfully.");
+                Console.WriteLine("Invalid email or password.\n");
+                return;
+            }
+
+            _loggedUser = _usersService.Get(email);
+
+        }
+
+        private void CreateAccount()
+        {
+            string name = _ioHelper.GetTextFromUser("Provide a name of your account");
+
+            if (_accountsService.GetAccountByName(name) == null)
+            {
+                _accountsService.Add(name);
+                Console.WriteLine($"Account {name} created successfully.\n");
             }
             else
             {
-                Console.WriteLine($"\nAn account with name {name} already exists.");
+                Console.WriteLine($"An account with name {name} already exists.\n");
             }
         }
 
-        private static void PrintAccountsBalance()
+        public void HandleDomesticTransfer()
         {
-            if (accounts.Count == 0)
+            HandleTransfer("domestic", 2);
+        }
+
+        public void HandleExternalTransfer()
+        {
+            HandleTransfer("external", 1);
+        }
+
+        public void HandleTransfer(string type, int accountsNeeded)
+        {
+            if (_accountsService.GetAllAccounts().Count < accountsNeeded)
             {
-                Console.WriteLine("\nNo accounts has been created.");
+                Console.WriteLine($"You need to have at least {accountsNeeded} account(s) to make a {type} transfer!\n");
+            }
+
+            var sender = ProvideSender("Provide name of the account you want to send money from");
+
+            if (!_accountsService.CheckIfTransactorExists(sender))
+            {
+                Console.WriteLine("An account with given identifier does not exist!\n");
                 return;
             }
 
-            StringBuilder sb = new StringBuilder();
-            sb.Append(string.Format("\n{0,-20}{1,-40}{2,-20}\n", "Account Name", "Account Number", "Balance"));
+            Account receiver;
 
-            foreach (Account account in accounts)
+            if (type == "external")
             {
-                sb.Append(account.ToString());
+                Guid receiverId;
+
+                if (!Guid.TryParse(_ioHelper.GetTextFromUser("Provide account number of the account you want to send money to"), out receiverId))
+                {
+                    Console.WriteLine("Invalid account number.");
+                    return;
+                }
+
+                receiver = new Account()
+                {
+                    Number = receiverId
+                };
             }
 
-            Console.WriteLine(sb.ToString());
-        }
-
-        private static void PrintAccountHistory()
-        {
-            if (accounts.Count == 0)
+            else
             {
-                Console.WriteLine("\nNo accounts has been created");
+                receiver = ProvideReceiver("Provide name of the account you want to send money to", type);
+
+                if(!_accountsService.CheckIfTransactorExists(receiver))
+                {
+                    Console.WriteLine("An account with given identifier does not exist!\n");
+                    return;
+                }
+            }
+
+            if (!_accountsService.CheckIfValidReceiver(sender, receiver))
+            {
+                Console.WriteLine("Receiver account is the same!\n");
                 return;
             }
 
-            foreach (Account account in accounts)
+            decimal amount = _ioHelper.GetDecimalFromUser("Input a transfer amount");
+
+            if (!_accountsService.CheckIfValidAmount(sender, amount))
             {
-                if (account.TransferList.Count == 0)
+                return;
+            }
+
+            var transferName = _ioHelper.GetTextFromUser("Input a transfer name");
+            var transfer = new Transfer(sender.Id, receiver, amount, transferName, type);
+
+            _accountsService.MakeTransfer(transfer);
+            Console.WriteLine("Transfer executed successfully.\n");
+
+        }
+
+        private Account ProvideSender(string message)
+        {
+            string transactorId = _ioHelper.GetTextFromUser(message);
+            return _accountsService.GetAccountByName(transactorId);
+        }
+
+        private Account ProvideReceiver(string message, string type)
+        {
+            string receiverId = _ioHelper.GetTextFromUser(message);
+            Account receiver;
+
+            if (type == "external")
+            {
+                receiver = _accountsService.GetAccountByNumber(receiverId);
+            }
+            else
+            {
+                receiver = _accountsService.GetAccountByName(receiverId);
+            }
+
+            return receiver;
+        }
+
+        private void PrintAccountsBalance()
+        {
+            var accounts = _accountsService.GetAllAccounts();
+
+            if (accounts.Count == 0)
+            {
+                Console.WriteLine("No accounts has been created.\n");
+                return;
+            }
+
+            _ioHelper.PrintAccountsBalance(accounts);
+        }
+
+        private void PrintAccountHistory()
+        {
+            var accounts = _accountsService.GetAllAccounts();
+
+            if (accounts.Count == 0)
+            {
+                Console.WriteLine("No accounts has been created.\n");
+                return;
+            }
+
+            foreach (var account in accounts)
+            {
+                var transfers = _transfersService.GetAll(account);
+                _ioHelper.PrintAccountName(account);
+
+                if (transfers.Count == 0)
                 {
-                    Console.WriteLine("\nNo transfers has been sent");
+                    Console.WriteLine("No transfers has been sent.\n");
+                    return;
                 }
 
-                Console.WriteLine($"{"Nazwa konta: ",-10} {account.Name,-20}\n");
-                
-                StringBuilder sb = new StringBuilder();
-                sb.Append($"\n{"Transfer Date",-19}" +
-                          $" {"Receiver Account Number",-36}" +
-                          $" {"Sender Account Number",-36}" +
-                          $" {"Transfer Name",-25}" +
-                          $" {"Transfer Amount",-20}" +
-                          $" {"Transfer Type",-20}\n");
-
-                foreach (Transfer transfer in account.TransferList)
-                {
-                    sb.Append(transfer.ToString());
-                }
-
-                Console.WriteLine(sb);
+                _ioHelper.PrintTransfers(transfers);
             }
-
-        }
-
-        private static string GetTextFromUser(string message)
-        {
-            Console.Write($"{message}: ");
-            return Console.ReadLine();
-        }
-
-        private static int GetIntFromUser(string message)
-        {
-            int number;
-            while (!int.TryParse(GetTextFromUser(message), out number))
-            {
-                Console.WriteLine("Not na integer - try again.");
-            }
-
-            return number;
-        }
-
-        private static decimal GetDecimalFromUser(string message)
-        {
-            decimal number;
-
-            while (!decimal.TryParse(GetTextFromUser(message), out number))
-            {
-                Console.WriteLine("Not a floating point number - try again.");
-            }
-
-            return number;
         }
     }
-
 }
