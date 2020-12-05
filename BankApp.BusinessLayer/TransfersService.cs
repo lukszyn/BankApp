@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using BankApp.DataLayer;
 using BankApp.DataLayer.Models;
 using Microsoft.EntityFrameworkCore;

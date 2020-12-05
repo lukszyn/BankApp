@@ -27,6 +27,7 @@ namespace BankApp
         public uint GetUintFromUser(string message)
         {
             uint number;
+
             while (!uint.TryParse(GetTextFromUser(message), out number))
             {
                 Console.WriteLine("Not a positive integer - try again.\n");
