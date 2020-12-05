@@ -1,7 +1,6 @@
-﻿using BankApp.DataLayer.Model;
+﻿using BankApp.DataLayer.Models;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Text;
 
 namespace BankApp
@@ -64,6 +63,11 @@ namespace BankApp
             return phoneNumber.Length == 9 && int.TryParse(phoneNumber, out number);
         }
 
+        public bool CheckIfNegative(decimal amount)
+        {
+            return amount <= 0;
+        }
+
         public void PrintAccountName(Account account)
         {
             Console.WriteLine($"\n{"Account name: ",-10} {account.Name,-20}");
@@ -72,7 +76,7 @@ namespace BankApp
         public void PrintAccountsBalance(List<Account> accounts)
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append($"\n{"Account Name",-20}{"Account Number",-40}{"Balance",-20}\n");
+            sb.Append($"\n{"Account Name",-30}{"Account Number",-40}{"Balance",-20}\n");
 
             foreach (var account in accounts)
             {
@@ -98,14 +102,12 @@ namespace BankApp
                 sb.Append(BuildTransferString(transfer));
             }
 
-            Console.WriteLine(sb);
+            Console.WriteLine(sb.ToString());
         }
 
         public string BuildAccountString(Account account)
         {
-            var sb = new StringBuilder();
-            sb.Append($"{account.Name,-20}{account.Number,-40}{account.Balance + "$",-20:N2}\n");
-            return sb.ToString();
+            return $"{account.Name,-30}{account.Number,-40}{account.Balance + "$",-20:N2}\n";
         }
 
         public string BuildTransferString(Transfer transfer)

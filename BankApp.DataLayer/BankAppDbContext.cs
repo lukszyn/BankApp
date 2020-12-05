@@ -1,4 +1,4 @@
-﻿using BankApp.DataLayer.Model;
+﻿using BankApp.DataLayer.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BankApp.DataLayer

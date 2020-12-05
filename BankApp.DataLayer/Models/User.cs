@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
-namespace BankApp.DataLayer.Model
+namespace BankApp.DataLayer.Models
 {
     public class User
     {

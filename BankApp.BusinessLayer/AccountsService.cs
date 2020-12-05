@@ -1,69 +1,55 @@
 ﻿using System;
-using BankApp.DataLayer.Model;
+using BankApp.DataLayer.Models;
 using BankApp.DataLayer;
 using System.Linq;
 using System.Collections.Generic;
-using System.Text;
 
 namespace BankApp.BusinessLayer
 {
     public class AccountsService
     {
-        public void MakeTransfer(Transfer transfer)
+        public void MakeTransfer(User user, Transfer transfer)
         {
             using (var context = new BankAppDbContext())
             {
-                var senderAccount = GetAccountById(transfer.AccountId);
+                var senderAccount = GetAccountById(user, transfer.AccountId);
                 new TransfersService().Add(transfer);
-                UpdateBalance(senderAccount.Id, transfer.Amount);
+                UpdateBalance(user, senderAccount.Id, transfer.Amount);
 
                 if (transfer.Type == "domestic")
                 {
-                    var receiverAccount = GetAccountByNumber(transfer.Receiver);
-                    UpdateBalance(receiverAccount.Id, -transfer.Amount);
+                    var receiverAccount = GetAccountByNumber(user, transfer.Receiver);
+                    UpdateBalance(user, receiverAccount.Id, -transfer.Amount);
                 }
 
                 context.SaveChanges();
             }
-
-        }
-        public bool CheckIfTransactorExists(Account transactor)
-        {
-            return transactor == null ? false : true;
         }
 
         public bool CheckIfValidReceiver(Account sender, Account receiver)
         {
-
             using (var context = new BankAppDbContext())
             {
                 return !context.Accounts.Any(account => account.Id == sender.Id && account.Id == receiver.Id);
             }
         }
 
-        public bool CheckIfValidAmount(Account sender, decimal amount)
+        public bool CheckIfSufficientFunds(Account sender, decimal amount)
         {
             using (var context = new BankAppDbContext())
             {
                 var senderAccount = context.Accounts.FirstOrDefault(account => account.Id == sender.Id);
-
-                if (senderAccount.Balance - amount < 0)
-                {
-                    return false;
-                }
-
-                return true;
+                return (senderAccount.Balance - amount < 0) ? false : true;
             }
         }
 
-        public void Add(string name)
+        public void Add(User user, string name)
         {
             using (var context = new BankAppDbContext())
             {
-                context.Accounts.Add(new Account(name));
+                context.Accounts.Add(new Account(user.Id, name));
                 context.SaveChanges();
             }
-            
         }
 
         public void Add(Guid guid)
@@ -75,11 +61,11 @@ namespace BankApp.BusinessLayer
             }
         }
 
-        public bool UpdateBalance(int accountId, decimal amount)
+        public bool UpdateBalance(User user, int accountId, decimal amount)
         {
             using (var context = new BankAppDbContext())
             {
-                var account = context.Accounts.FirstOrDefault(account => account.Id == accountId);
+                var account = context.Accounts.FirstOrDefault(account => account.Id == accountId && account.UserId == user.Id);
 
                 if (account == null)
                 {
@@ -93,35 +79,35 @@ namespace BankApp.BusinessLayer
             return true;
         }
 
-        public List<Account> GetAllAccounts()
+        public List<Account> GetAllAccounts(User user)
         {
             using (var context = new BankAppDbContext())
             {
-                return context.Accounts.ToList();
+                return context.Accounts.Where(account => account.UserId == user.Id).ToList();
             }
         }
 
-        public Account GetAccountByName(string name)
+        public Account GetAccountByName(User user, string name)
         {
             using (var context = new BankAppDbContext())
             {
-                return context.Accounts.FirstOrDefault(account => account.Name == name);
+                return context.Accounts.FirstOrDefault(account => account.Name == name && account.UserId == user.Id);
             }
         }
 
-        public Account GetAccountByNumber(string number)
+        public Account GetAccountByNumber(User user, string number)
         {
             using (var context = new BankAppDbContext())
             {
-                return context.Accounts.FirstOrDefault(account => account.Number.ToString() == number);
+                return context.Accounts.FirstOrDefault(account => account.Number.ToString() == number && account.UserId == user.Id);
             }
         }
 
-        public Account GetAccountById(int id)
+        public Account GetAccountById(User user, int id)
         {
             using (var context = new BankAppDbContext())
             {
-                return context.Accounts.FirstOrDefault(account => account.Id == id);
+                return context.Accounts.FirstOrDefault(account => account.Id == id && account.UserId == user.Id);
             }
         }
     }

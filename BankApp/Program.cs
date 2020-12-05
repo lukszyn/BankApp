@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Text;
 using BankApp.BusinessLayer;
-using BankApp.DataLayer.Model;
+using BankApp.DataLayer.Models;
 
 namespace BankApp
 {
@@ -27,11 +26,13 @@ namespace BankApp
             RegisterLogMenuOptions();
             int userChoice;
 
+            Console.WriteLine("Welcome to the BankApp.\n");
+
             do
             {
                 _loggingMenu.PrintAvailableOptions();
-
-                userChoice = _ioHelper.GetIntFromUser("Choose action");
+                Console.WriteLine("Press 0 to exit.");
+                userChoice = _ioHelper.GetIntFromUser("\nChoose action");
 
                 _loggingMenu.ExecuteOption(userChoice);
 
@@ -45,8 +46,9 @@ namespace BankApp
             do
             {
                 _menu.PrintAvailableOptions();
+                Console.WriteLine("Press 0 to exit.");
 
-                userChoice = _ioHelper.GetIntFromUser("Choose action");
+                userChoice = _ioHelper.GetIntFromUser("\nChoose action");
 
                 _menu.ExecuteOption(userChoice);
 
@@ -58,22 +60,22 @@ namespace BankApp
 
         private void RegisterLogMenuOptions()
         {
-            _loggingMenu.AddOption(new MenuItem { Key = 1, Action = SignUp, Description = "Sign up to the BankApp" });
-            _loggingMenu.AddOption(new MenuItem { Key = 2, Action = SignIn, Description = "Sign in to your BankApp account" });
+            _loggingMenu.AddOption(new MenuItem { Key = 1, Action = SignUp, Description = "Press 1 to Sign up to the BankApp" });
+            _loggingMenu.AddOption(new MenuItem { Key = 2, Action = SignIn, Description = "Press 2 to Sign in to your BankApp account" });
         }
 
         private void RegisterMenuOptions()
         {
-            _menu.AddOption(new MenuItem { Key = 3, Action = CreateAccount, Description = "Create an account" });
-            _menu.AddOption(new MenuItem { Key = 4, Action = HandleDomesticTransfer, Description = "Make a domestic transfer" });
-            _menu.AddOption(new MenuItem { Key = 5, Action = HandleExternalTransfer, Description = "Make an outgoing transfer" });
-            _menu.AddOption(new MenuItem { Key = 6, Action = PrintAccountsBalance, Description = "Display your accounts\' balance" });
-            _menu.AddOption(new MenuItem { Key = 7, Action = PrintAccountHistory, Description = "Display transfers\' history" });
+            _menu.AddOption(new MenuItem { Key = 1, Action = CreateAccount, Description = "Press 1 to Create an account" });
+            _menu.AddOption(new MenuItem { Key = 2, Action = HandleDomesticTransfer, Description = "Press 2 to Make a domestic transfer" });
+            _menu.AddOption(new MenuItem { Key = 3, Action = HandleExternalTransfer, Description = "Press 3 to Make an outgoing transfer" });
+            _menu.AddOption(new MenuItem { Key = 4, Action = PrintAccountsBalance, Description = "Press 4 to Display your accounts\' balance" });
+            _menu.AddOption(new MenuItem { Key = 5, Action = PrintAccountHistory, Description = "Press 5 to Display transfers\' history" });
         }
 
         private void SignUp()
         {
-            string email = _ioHelper.GetTextFromUser("Provide an email");
+            var email = _ioHelper.GetTextFromUser("Provide an email");
 
             if (!_ioHelper.ValidateEmail(email))
             {
@@ -81,19 +83,19 @@ namespace BankApp
                 return;
             }
 
-            string password = _ioHelper.GetTextFromUser("Provide a password (minimum 6 characters)");
+            var password = _ioHelper.GetTextFromUser("Provide a password (minimum 6 characters)");
 
             if (!_ioHelper.ValidatePassword(password))
             {
-                Console.WriteLine("Password must have at least 6 characters!");
+                Console.WriteLine("Password must have at least 6 characters!\n");
                 return;
             }
 
-            string phoneNumber = _ioHelper.GetTextFromUser("Provide a phone number");
+            var phoneNumber = _ioHelper.GetTextFromUser("Provide a phone number");
 
             if (!_ioHelper.ValidatePhoneNumber(phoneNumber))
             {
-                Console.WriteLine("Phone number must consist of 9 digits!");
+                Console.WriteLine("Phone number must consist of 9 digits!\n");
                 return;
             }
 
@@ -112,8 +114,8 @@ namespace BankApp
 
         private void SignIn()
         {
-            string email = _ioHelper.GetTextFromUser("Provide an email");
-            string password = _ioHelper.GetTextFromUser("Provide a password");
+            var email = _ioHelper.GetTextFromUser("Provide an email");
+            var password = _ioHelper.GetTextFromUser("Provide a password");
 
             if(!_usersService.CheckCredentials(email, password))
             {
@@ -121,17 +123,17 @@ namespace BankApp
                 return;
             }
 
+            Console.WriteLine($"\nWelcome to your account, {email}\n");
             _loggedUser = _usersService.Get(email);
-
         }
 
         private void CreateAccount()
         {
-            string name = _ioHelper.GetTextFromUser("Provide a name of your account");
+            var name = _ioHelper.GetTextFromUser("Provide a name of your account");
 
-            if (_accountsService.GetAccountByName(name) == null)
+            if (_accountsService.GetAccountByName(_loggedUser, name) == null)
             {
-                _accountsService.Add(name);
+                _accountsService.Add(_loggedUser, name);
                 Console.WriteLine($"Account {name} created successfully.\n");
             }
             else
@@ -152,46 +154,25 @@ namespace BankApp
 
         public void HandleTransfer(string type, int accountsNeeded)
         {
-            if (_accountsService.GetAllAccounts().Count < accountsNeeded)
+            if (_accountsService.GetAllAccounts(_loggedUser).Count < accountsNeeded)
             {
                 Console.WriteLine($"You need to have at least {accountsNeeded} account(s) to make a {type} transfer!\n");
-            }
-
-            var sender = ProvideSender("Provide name of the account you want to send money from");
-
-            if (!_accountsService.CheckIfTransactorExists(sender))
-            {
-                Console.WriteLine("An account with given identifier does not exist!\n");
                 return;
             }
 
+            var sender = ProvideTransactor("Provide name of the account you want to send money from");
             Account receiver;
+
+            if (!CheckTransactor(sender)) return;
 
             if (type == "external")
             {
-                Guid receiverId;
-
-                if (!Guid.TryParse(_ioHelper.GetTextFromUser("Provide account number of the account you want to send money to"), out receiverId))
-                {
-                    Console.WriteLine("Invalid account number.");
-                    return;
-                }
-
-                receiver = new Account()
-                {
-                    Number = receiverId
-                };
+                receiver = ProvideExternalReceiver("Provide account number of the account you want to send money to");
             }
-
             else
             {
-                receiver = ProvideReceiver("Provide name of the account you want to send money to", type);
-
-                if(!_accountsService.CheckIfTransactorExists(receiver))
-                {
-                    Console.WriteLine("An account with given identifier does not exist!\n");
-                    return;
-                }
+                receiver = ProvideTransactor("Provide name of the account you want to send money to");
+                if (!CheckTransactor(receiver)) return;
             }
 
             if (!_accountsService.CheckIfValidReceiver(sender, receiver))
@@ -200,47 +181,64 @@ namespace BankApp
                 return;
             }
 
-            decimal amount = _ioHelper.GetDecimalFromUser("Input a transfer amount");
-
-            if (!_accountsService.CheckIfValidAmount(sender, amount))
-            {
-                return;
-            }
+            var amount = _ioHelper.GetDecimalFromUser("Input a transfer amount");
+            if (!ValidateAmount(sender, amount)) return;
 
             var transferName = _ioHelper.GetTextFromUser("Input a transfer name");
             var transfer = new Transfer(sender.Id, receiver, amount, transferName, type);
 
-            _accountsService.MakeTransfer(transfer);
+            _accountsService.MakeTransfer(_loggedUser, transfer);
             Console.WriteLine("Transfer executed successfully.\n");
-
         }
 
-        private Account ProvideSender(string message)
+        private Account ProvideExternalReceiver(string message)
         {
-            string transactorId = _ioHelper.GetTextFromUser(message);
-            return _accountsService.GetAccountByName(transactorId);
+            Guid receiverId;
+
+            while (!Guid.TryParse(_ioHelper.GetTextFromUser(message), out receiverId))
+            {
+                Console.WriteLine("Invalid account number.");
+            }
+
+            return new Account() { Number = receiverId };
         }
 
-        private Account ProvideReceiver(string message, string type)
+        private Account ProvideTransactor(string message)
         {
-            string receiverId = _ioHelper.GetTextFromUser(message);
-            Account receiver;
+            return _accountsService.GetAccountByName(_loggedUser, _ioHelper.GetTextFromUser(message));
+        }
 
-            if (type == "external")
+        private bool CheckTransactor(Account transactor)
+        {
+            if (transactor == null)
             {
-                receiver = _accountsService.GetAccountByNumber(receiverId);
-            }
-            else
-            {
-                receiver = _accountsService.GetAccountByName(receiverId);
+                Console.WriteLine("An account with given identifier does not exist!\n");
+                return false;
             }
 
-            return receiver;
+            return true;
+        }
+
+        private bool ValidateAmount(Account sender, decimal amount)
+        {
+            if (_ioHelper.CheckIfNegative(amount))
+            {
+                Console.WriteLine("Given amount must be greater than 0!\n");
+                return false;
+            }
+
+            else if (!_accountsService.CheckIfSufficientFunds(sender, amount))
+            {
+                Console.WriteLine("You do not have sufficient amount of cash on the account.\n");
+                return false;
+            }
+
+            return true;
         }
 
         private void PrintAccountsBalance()
         {
-            var accounts = _accountsService.GetAllAccounts();
+            var accounts = _accountsService.GetAllAccounts(_loggedUser);
 
             if (accounts.Count == 0)
             {
@@ -253,7 +251,7 @@ namespace BankApp
 
         private void PrintAccountHistory()
         {
-            var accounts = _accountsService.GetAllAccounts();
+            var accounts = _accountsService.GetAllAccounts(_loggedUser);
 
             if (accounts.Count == 0)
             {

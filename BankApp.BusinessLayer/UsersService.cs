@@ -1,6 +1,5 @@
 ﻿using BankApp.DataLayer;
-using BankApp.DataLayer.Model;
-using System;
+using BankApp.DataLayer.Models;
 using System.Linq;
 
 namespace BankApp.BusinessLayer
