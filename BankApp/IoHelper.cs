@@ -1,4 +1,5 @@
-﻿using BankApp.DataLayer.Models;
+﻿using BankApp.BusinessLayer.Models;
+using BankApp.DataLayer.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -74,7 +75,7 @@ namespace BankApp
             Console.WriteLine($"\n{"Account name: ",-10} {account.Name,-20}");
         }
 
-        public void PrintAccountsBalance(List<Account> accounts)
+        public void PrintAccountsBalance(ICollection<Account> accounts)
         {
             StringBuilder sb = new StringBuilder();
             sb.Append($"\n{"Account Name",-30}{"Account Number",-40}{"Balance",-20}\n");
@@ -87,7 +88,7 @@ namespace BankApp
             Console.WriteLine(sb.ToString());
         }
 
-        public void PrintTransfers(List<Transfer> transfers)
+        public void PrintTransfers(ICollection<Transfer> transfers)
         {
             StringBuilder sb = new StringBuilder();
 
@@ -114,11 +115,44 @@ namespace BankApp
         public string BuildTransferString(Transfer transfer)
         {
             return $"{transfer.Date,-0:dd/MM/yyyy HH:mm:ss}" +
-                $" {transfer.Receiver,-36}" +
+                $" {transfer.Receiver.Number, -36}" +
                 $" {transfer.Account.Number,-36}" +
                 $" {transfer.Name,-25}" +
                 $" {transfer.Amount + "$",-20:N2}" +
                 $" {transfer.Type,-20}\n";
+        }
+
+        public void PrintStatement(AccountStatement accountStatement)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("----------------------------------------\n");
+            sb.Append("Outgoing Transfers Summary\n\n");
+            sb.Append($"{"Receiver Account Number",-36}" +
+                      $"{"Transfers Sum", 20}\n");
+
+            foreach (var transfer in accountStatement.OutgoingTransfersStatement)
+            {
+                sb.Append($"{transfer.Key, -36}{transfer.Value, 20:N2}$\n");
+            }
+
+            sb.Append($"Overall: {accountStatement.OutgoingTransfersSum, 5:N2}$\n\n");
+
+            sb.Append("Incoming Transfers Summary\n\n");
+            sb.Append($"{"Sender Account Number",-36}" +
+                $" {"Transfers Sum", 20}\n");
+
+            foreach (var transfer in accountStatement.IncomingTransfersStatement)
+            {
+                sb.Append($"{transfer.Key,-36}{transfer.Value, 20:N2}$\n");
+            }
+
+            sb.Append($"Overall: {accountStatement.IncomingTransfersSum, 5:N2}$\n\n");
+
+            sb.Append($"Maximum Transfer Amount: {accountStatement.MaxTransfer, 10:N2}$\n");
+            sb.Append($"Minimum Transfer Amount: {accountStatement.MinTransfer, 10:N2}$\n");
+            sb.Append($"Average Transfer Amount: {accountStatement.AverageTransfer, 10:N2}$\n");
+
+            Console.WriteLine(sb.ToString());
         }
     }
 }

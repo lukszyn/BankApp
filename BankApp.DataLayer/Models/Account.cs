@@ -1,16 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BankApp.DataLayer.Models
 {
     public class Account
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public Guid Number { get; set; }
-        public decimal Balance { get; set; }
-        public List<Transfer> Transfers { get; set; }
-        public int UserId { get; set; }
+        public decimal? Balance { get; set; }
+
+        [InverseProperty("Account")]
+        public ICollection<Transfer> OutgoingTransfers { get; set; }
+
+        [InverseProperty("Receiver")]
+        public ICollection<Transfer> IncomingTransfers { get; set; }
+
+
+        public int? UserId { get; set; }
         public User User{ get; set; }
 
         public Account(Guid number)
@@ -22,7 +30,7 @@ namespace BankApp.DataLayer.Models
         {
         }
 
-        public Account(int userId, string name) : this()
+        public Account(int userId, string name)
         {
             UserId = userId;
             Name = name;

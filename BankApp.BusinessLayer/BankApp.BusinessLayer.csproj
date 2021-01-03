@@ -8,4 +8,10 @@
     <ProjectReference Include="..\BankApp.DataLayer\BankApp.DataLayer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="BankingProject.OutgoingTransfers.Sender">
+      <HintPath>..\ExternalLibraries\BankingProject.OutgoingTransfers.Sender\BankingProject.OutgoingTransfers.Sender.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

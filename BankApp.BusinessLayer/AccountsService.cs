@@ -3,32 +3,61 @@ using BankApp.DataLayer.Models;
 using BankApp.DataLayer;
 using System.Linq;
 using System.Collections.Generic;
+using BankingProject.OutgoingTransfers.Sender;
+using BankApp.BusinessLayer.Serializers;
+using BankApp.BusinessLayer.Models;
 
 namespace BankApp.BusinessLayer
 {
     public class AccountsService
     {
-        public void MakeTransfer(User user, Transfer transfer)
+        private TransfersService _transfersService;
+        private Func<IBankAppDbContext> _dbContextFactoryMethod;
+
+        public AccountsService(TransfersService transfersService,
+                Func<IBankAppDbContext> dbContextFactoryMethod)
         {
-            using (var context = new BankAppDbContext())
+            _transfersService = transfersService;
+            _dbContextFactoryMethod = dbContextFactoryMethod;
+        }
+
+        public void MakeTransfer(Transfer transfer)
+        {
+            var senderAccount = GetAccountById(transfer.AccountId);
+            _transfersService.AddOutgoingTransfer(senderAccount.Id, transfer);
+            UpdateBalance(senderAccount.Id, transfer.Amount);
+
+            if (!CheckIfExternal(transfer.ReceiverId))
             {
-                var senderAccount = GetAccountById(user, transfer.AccountId);
-                new TransfersService().Add(transfer);
-                UpdateBalance(user, senderAccount.Id, transfer.Amount);
+                var incomingTransfer = new Transfer(transfer.AccountId,
+                    transfer.ReceiverId,
+                    transfer.Amount,
+                    transfer.Name,
+                    TransferType.INCOMING);
 
-                if (transfer.Type == "domestic")
-                {
-                    var receiverAccount = GetAccountByNumber(user, transfer.Receiver);
-                    UpdateBalance(user, receiverAccount.Id, -transfer.Amount);
-                }
-
-                context.SaveChanges();
+                _transfersService.AddIncomingTransfer(transfer.ReceiverId, incomingTransfer);
+                UpdateBalance(transfer.ReceiverId, -transfer.Amount);
             }
+            else
+            {
+                SendJsonInfo(transfer);
+            }
+        }
+
+        private void SendJsonInfo(Transfer transfer)
+        {
+            transfer.Date = DateTime.Now;
+
+            JsonSerializer jsonSerializer = new JsonSerializer();
+            var transferJson = jsonSerializer.Serialize(transfer);
+
+            var sender = new GlobalOutgoingTransfersSender();
+            sender.Send(transferJson);
         }
 
         public bool CheckIfValidReceiver(Account sender, Account receiver)
         {
-            using (var context = new BankAppDbContext())
+            using (var context = _dbContextFactoryMethod())
             {
                 return !context.Accounts.Any(account => account.Id == sender.Id && account.Id == receiver.Id);
             }
@@ -36,7 +65,7 @@ namespace BankApp.BusinessLayer
 
         public bool CheckIfSufficientFunds(Account sender, decimal amount)
         {
-            using (var context = new BankAppDbContext())
+            using (var context = _dbContextFactoryMethod())
             {
                 var senderAccount = context.Accounts.FirstOrDefault(account => account.Id == sender.Id);
                 return (senderAccount.Balance - amount < 0) ? false : true;
@@ -45,41 +74,14 @@ namespace BankApp.BusinessLayer
 
         public void Add(User user, string name)
         {
-            using (var context = new BankAppDbContext())
+            using (var context = _dbContextFactoryMethod())
             {
                 context.Accounts.Add(new Account(user.Id, name));
                 context.SaveChanges();
             }
         }
 
-        public void Add(Guid guid)
-        {
-            using (var context = new BankAppDbContext())
-            {
-                context.Accounts.Add(new Account(guid));
-                context.SaveChanges();
-            }
-        }
-
-        public bool UpdateBalance(User user, int accountId, decimal amount)
-        {
-            using (var context = new BankAppDbContext())
-            {
-                var account = context.Accounts.FirstOrDefault(account => account.Id == accountId && account.UserId == user.Id);
-
-                if (account == null)
-                {
-                    return false;
-                }
-
-                account.Balance -= amount;
-                context.SaveChanges();
-            }
-
-            return true;
-        }
-
-        public List<Account> GetAllAccounts(User user)
+        public ICollection<Account> GetAllUserAccounts(User user)
         {
             using (var context = new BankAppDbContext())
             {
@@ -95,20 +97,89 @@ namespace BankApp.BusinessLayer
             }
         }
 
-        public Account GetAccountByNumber(User user, string number)
+        public Account GetAccountByNumber(string number)
         {
             using (var context = new BankAppDbContext())
             {
-                return context.Accounts.FirstOrDefault(account => account.Number.ToString() == number && account.UserId == user.Id);
+                return context.Accounts.FirstOrDefault(account => account.Number.ToString() == number);
             }
         }
 
-        public Account GetAccountById(User user, int id)
+        public Account GetAccountById(int id)
         {
             using (var context = new BankAppDbContext())
             {
-                return context.Accounts.FirstOrDefault(account => account.Id == id && account.UserId == user.Id);
+                return context.Accounts.FirstOrDefault(account => account.Id == id);
             }
+        }
+
+        public bool UpdateBalance(int? accountId, decimal amount)
+        {
+            using (var context = _dbContextFactoryMethod())
+            {
+                var account = context.Accounts.FirstOrDefault(account => account.Id == accountId);
+
+                if (account == null)
+                {
+                    return false;
+                }
+
+                account.Balance -= amount;
+                context.SaveChanges();
+            }
+
+            return true;
+        }
+
+        public bool CheckIfExternal(int? id)
+        {
+            using (var context = _dbContextFactoryMethod())
+            {
+                return context.Accounts.Any(account => account.Id == id && account.UserId == null);
+            }
+        }
+
+        public bool CheckIfExternal(string number)
+        {
+            using (var context = _dbContextFactoryMethod())
+            {
+                return !context.Accounts.Any(account => account.Number.ToString() == number && account.UserId != null);
+            }
+        }
+
+        public void AddToExternalTransfers(Transfer transfer)
+        {
+            ExternalTransfersService.Add(transfer);
+        }
+
+        public void ExecuteExternalTransfers()
+        {
+            var transfersToExecute = ExternalTransfersService.GetAll();
+
+            if (transfersToExecute != null)
+            {
+                foreach (var transfer in transfersToExecute)
+                {
+                    MakeTransfer(transfer);
+                }
+            }
+
+            ExternalTransfersService.Remove();
+        }
+
+        public AccountStatement CreateAccountStatement(Account account)
+        {
+            var accountStatement = new AccountStatement();
+
+            accountStatement.OutgoingTransfersStatement = _transfersService.GetOutgoingTransfersStatement(account);
+            accountStatement.IncomingTransfersStatement = _transfersService.GetIncomingTransfersStatement(account);
+            accountStatement.OutgoingTransfersSum = _transfersService.GetOutgoingTransfersSum(account);
+            accountStatement.IncomingTransfersSum = _transfersService.GetIncomingTransfersSum(account);
+            accountStatement.MaxTransfer = _transfersService.GetMaxTransfer(account);
+            accountStatement.MinTransfer = _transfersService.GetMinTransfer(account);
+            accountStatement.AverageTransfer = _transfersService.GetAverageTransfer(account);
+
+            return accountStatement;
         }
     }
 }

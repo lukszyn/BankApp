@@ -1,5 +1,6 @@
 ﻿using System;
 using BankApp.BusinessLayer;
+using BankApp.DataLayer;
 using BankApp.DataLayer.Models;
 
 namespace BankApp
@@ -9,11 +10,13 @@ namespace BankApp
         private Menu _loggingMenu = new Menu();
         private Menu _menu = new Menu();
         private IoHelper _ioHelper = new IoHelper();
-        private AccountsService _accountsService = new AccountsService();
-        private TransfersService _transfersService = new TransfersService();
+        private AccountsService _accountsService = new AccountsService(new TransfersService(new TransferRepository()), () => new BankAppDbContext());
+        private TransfersService _transfersService = new TransfersService(new TransferRepository());
         private UsersService _usersService = new UsersService();
         private DatabaseManagementService _databaseManagementService = new DatabaseManagementService();
         private User _loggedUser;
+        private TimerService _timer = new TimerService();
+        private FilesService _filesService = new FilesService();
 
         static void Main()
         {
@@ -23,17 +26,15 @@ namespace BankApp
         void Run()
         {
             _databaseManagementService.EnsureDatabaseCreation();
+            _timer.SetTimer(_accountsService.ExecuteExternalTransfers, 1000 * 60 * 5);
+
+            Console.WriteLine("Welcome to the BankApp.\n");
             RegisterLogMenuOptions();
             int userChoice;
 
-            Console.WriteLine("Welcome to the BankApp.\n");
-
             do
             {
-                _loggingMenu.PrintAvailableOptions();
-                Console.WriteLine("Press 0 to exit.");
-                userChoice = _ioHelper.GetIntFromUser("\nChoose action");
-
+                userChoice = GetUserOption(_loggingMenu);
                 _loggingMenu.ExecuteOption(userChoice);
 
                 if (userChoice == 0) return;
@@ -45,10 +46,7 @@ namespace BankApp
 
             do
             {
-                _menu.PrintAvailableOptions();
-                Console.WriteLine("Press 0 to exit.");
-
-                userChoice = _ioHelper.GetIntFromUser("\nChoose action");
+                userChoice = GetUserOption(_menu);
 
                 _menu.ExecuteOption(userChoice);
 
@@ -56,6 +54,13 @@ namespace BankApp
             }
             while (userChoice != 0);
 
+        }
+
+        private int GetUserOption(Menu menu)
+        {
+            menu.PrintAvailableOptions();
+            Console.WriteLine("Press 0 to exit.");
+            return _ioHelper.GetIntFromUser("\nChoose action");
         }
 
         private void RegisterLogMenuOptions()
@@ -71,6 +76,7 @@ namespace BankApp
             _menu.AddOption(new MenuItem { Key = 3, Action = HandleExternalTransfer, Description = "Press 3 to Make an outgoing transfer" });
             _menu.AddOption(new MenuItem { Key = 4, Action = PrintAccountsBalance, Description = "Press 4 to Display your accounts\' balance" });
             _menu.AddOption(new MenuItem { Key = 5, Action = PrintAccountHistory, Description = "Press 5 to Display transfers\' history" });
+            _menu.AddOption(new MenuItem { Key = 6, Action = GenerateAccountStatement, Description = "Press 6 to Generate account\'s statement" });
         }
 
         private void SignUp()
@@ -144,36 +150,29 @@ namespace BankApp
 
         public void HandleDomesticTransfer()
         {
-            HandleTransfer("domestic", 2);
+            HandleTransfer(TransferType.INTERNAL, 2);
         }
 
         public void HandleExternalTransfer()
         {
-            HandleTransfer("external", 1);
+            HandleTransfer(TransferType.EXTERNAL, 1);
         }
 
-        public void HandleTransfer(string type, int accountsNeeded)
+        public void HandleTransfer(TransferType type, int accountsNeeded)
         {
-            if (_accountsService.GetAllAccounts(_loggedUser).Count < accountsNeeded)
+            if (_accountsService.GetAllUserAccounts(_loggedUser).Count < accountsNeeded)
             {
                 Console.WriteLine($"You need to have at least {accountsNeeded} account(s) to make a {type} transfer!\n");
                 return;
             }
 
-            var sender = ProvideTransactor("Provide name of the account you want to send money from");
-            Account receiver;
+            var sender = ProvideAccount("Provide name of the account you want to send money from");
+            
+            if (!CheckAccountExist(sender)) return;
 
-            if (!CheckTransactor(sender)) return;
+            Account receiver = GetReceiver(type);
 
-            if (type == "external")
-            {
-                receiver = ProvideExternalReceiver("Provide account number of the account you want to send money to");
-            }
-            else
-            {
-                receiver = ProvideTransactor("Provide name of the account you want to send money to");
-                if (!CheckTransactor(receiver)) return;
-            }
+            if (!CheckAccountExist(receiver)) return;
 
             if (!_accountsService.CheckIfValidReceiver(sender, receiver))
             {
@@ -182,13 +181,45 @@ namespace BankApp
             }
 
             var amount = _ioHelper.GetDecimalFromUser("Input a transfer amount");
+
             if (!ValidateAmount(sender, amount)) return;
 
             var transferName = _ioHelper.GetTextFromUser("Input a transfer name");
-            var transfer = new Transfer(sender.Id, receiver, amount, transferName, type);
+            var transfer = new Transfer(sender.Id, receiver.Id, amount, transferName, type);
 
-            _accountsService.MakeTransfer(_loggedUser, transfer);
+            if (_accountsService.CheckIfExternal(receiver.Number.ToString()))
+            {
+                transfer.ReceiverId = null;
+                transfer.Receiver = receiver;
+                _accountsService.AddToExternalTransfers(transfer);
+                Console.WriteLine("Transfer executed successfully.\n");
+                return;
+            }
+
+            _accountsService.MakeTransfer(transfer);
             Console.WriteLine("Transfer executed successfully.\n");
+        }
+
+        private Account GetReceiver(TransferType type)
+        {
+            Account receiver;
+
+            if (type == TransferType.EXTERNAL)
+            {
+                var extReceiver = ProvideExternalReceiver("Provide account number of the account you want to send money to");
+                receiver = _accountsService.GetAccountByNumber(extReceiver.Number.ToString());
+
+                if (receiver == null)
+                {
+                    receiver = new Account { Number = extReceiver.Number };
+                }
+            }
+            else
+            {
+                receiver = ProvideAccount("Provide name of the account you want to send money to");
+            }
+
+            return receiver;
         }
 
         private Account ProvideExternalReceiver(string message)
@@ -203,12 +234,12 @@ namespace BankApp
             return new Account() { Number = receiverId };
         }
 
-        private Account ProvideTransactor(string message)
+        private Account ProvideAccount(string message)
         {
             return _accountsService.GetAccountByName(_loggedUser, _ioHelper.GetTextFromUser(message));
         }
 
-        private bool CheckTransactor(Account transactor)
+        private bool CheckAccountExist(Account transactor)
         {
             if (transactor == null)
             {
@@ -238,7 +269,7 @@ namespace BankApp
 
         private void PrintAccountsBalance()
         {
-            var accounts = _accountsService.GetAllAccounts(_loggedUser);
+            var accounts = _accountsService.GetAllUserAccounts(_loggedUser);
 
             if (accounts.Count == 0)
             {
@@ -251,7 +282,7 @@ namespace BankApp
 
         private void PrintAccountHistory()
         {
-            var accounts = _accountsService.GetAllAccounts(_loggedUser);
+            var accounts = _accountsService.GetAllUserAccounts(_loggedUser);
 
             if (accounts.Count == 0)
             {
@@ -264,7 +295,7 @@ namespace BankApp
                 var transfers = _transfersService.GetAll(account);
                 _ioHelper.PrintAccountName(account);
 
-                if (transfers.Count == 0)
+                if (transfers == null)
                 {
                     Console.WriteLine("No transfers has been sent.\n");
                     return;
@@ -272,6 +303,51 @@ namespace BankApp
 
                 _ioHelper.PrintTransfers(transfers);
             }
+        }
+
+        private void GenerateAccountStatement()
+        {
+            Account account = GetAccount();
+
+            if (account == null)
+            {
+                return;
+            }
+
+            var accountStatement = _accountsService.CreateAccountStatement(account);
+
+            _ioHelper.PrintStatement(accountStatement);
+
+            var userAnswer = _ioHelper
+                .GetTextFromUser("Press y to export account statement to file, press any other key to return to the menu")
+                .ToLower();
+
+            if (userAnswer != "y") return;
+            
+            if (_filesService.ExportToFile(_ioHelper.GetTextFromUser("Provide the path to save the file:"), accountStatement))
+            {
+                Console.WriteLine("Account statement exported successfully.\n");
+            }
+            else
+            {
+                Console.WriteLine("Error occurred during statement export.\n");
+            }
+        }
+
+        private Account GetAccount()
+        {
+            
+            if (_accountsService.GetAllUserAccounts(_loggedUser).Count < 1)
+            {
+                Console.WriteLine($"You need to have at least one account to make an account statement.\n");
+                return null;
+            }
+
+            var account = ProvideAccount("Provide name of the account for which you want to generate the statement");
+
+            if (!CheckAccountExist(account)) return null;
+
+            return account;
         }
     }
 }
