@@ -48,7 +48,7 @@ namespace BankApp.BusinessLayer
             var incomingTransfers = _transferRepository.GetIncomingTransfers(account);
             var outgoingTransfers = _transferRepository.GetOutgoingTransfers(account);
 
-            if (incomingTransfers.Any() && outgoingTransfers.Any()) return null; 
+            if (!incomingTransfers.Any() && !outgoingTransfers.Any()) return null; 
 
             return incomingTransfers.Concat(outgoingTransfers).OrderBy(t => t.Date).ToList();
         }
