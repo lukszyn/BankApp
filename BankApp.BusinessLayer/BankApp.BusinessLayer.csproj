@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BankApp.DataLayer\BankApp.DataLayer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BankingProject.OutgoingTransfers.Sender">
+      <HintPath>..\ExternalLibraries\BankingProject.OutgoingTransfers.Sender\BankingProject.OutgoingTransfers.Sender.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

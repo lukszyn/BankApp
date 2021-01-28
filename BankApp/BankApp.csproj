@@ -1,8 +1,30 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="5.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="5.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BankApp.BusinessLayer\BankApp.BusinessLayer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BankingProject.OutgoingTransfers.Receiver">
+      <HintPath>..\ExternalLibraries\BankingProject.OutgoingTransfers.Receiver\BankingProject.OutgoingTransfers.Receiver.dll</HintPath>
+    </Reference>
+    <Reference Include="BankingProject.OutgoingTransfers.Sender">
+      <HintPath>..\ExternalLibraries\BankingProject.OutgoingTransfers.Sender\BankingProject.OutgoingTransfers.Sender.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 
 </Project>
